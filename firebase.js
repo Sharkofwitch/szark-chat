@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, orderBy, onSnapshot, getDocs } from "firebase/firestore";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc } from "firebase/firestore";
 
+// 🔹 Firebase Config from environment variables
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -16,20 +17,23 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Function to store user info in Firestore
-const saveUserToFirestore = async (user) => {
-  if (user) {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-      });
-    }
-  }
+// Function to send messages to a specific room
+const sendMessage = async (roomId, user, text) => {
+  if (!roomId || !text.trim()) return;
+  await addDoc(collection(db, "chats", roomId, "messages"), {
+    text,
+    user,
+    timestamp: new Date(),
+  });
 };
 
-export { auth, googleProvider, signInWithPopup, signOut, db, collection, addDoc, doc, setDoc, getDoc, query, orderBy, onSnapshot, getDocs, saveUserToFirestore };
+// Function to listen for messages in a specific room
+const listenToMessages = (roomId, callback) => {
+  if (!roomId) return;
+  const q = query(collection(db, "chats", roomId, "messages"), orderBy("timestamp", "asc"));
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  });
+};
+
+export { auth, googleProvider, signInWithPopup, signOut, db, sendMessage, listenToMessages };
